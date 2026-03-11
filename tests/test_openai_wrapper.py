@@ -2,23 +2,28 @@ from types import SimpleNamespace
 from app.agent.llm import LLMClient
 
 
-class FakeResponsesAPI:
-    def create(self, **kwargs):
-        return SimpleNamespace(output_text="smalltalk")
+def test_answer_sends_expected_payload(monkeypatch):
+    captured = {}
 
+    class FakeResponsesAPI:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(output_text="Final answer")
 
-class FakeOpenAIClient:
-    def __init__(self):
-        self.responses = FakeResponsesAPI()
+    class FakeOpenAIClient:
+        def __init__(self):
+            self.responses = FakeResponsesAPI()
 
-
-def test_classify_intent_monkeypatched(monkeypatch):
     monkeypatch.setattr("app.agent.llm.OpenAI", lambda: FakeOpenAIClient())
 
     llm = LLMClient()
-    result = llm.classify_intent(
-        "You are a concise assistant.",
-        "hello there"
+    result = llm.answer(
+        "system-v2",
+        "What is the weather?",
+        "Weather for London: 12C and cloudy"
     )
 
-    assert result == "smalltalk"
+    assert result == "Final answer"
+    assert captured["model"] == "gpt-5-mini"
+    assert captured["input"][0]["content"] == "system-v2"
+    assert "Tool result: Weather for London: 12C and cloudy" in captured["input"][1]["content"]
